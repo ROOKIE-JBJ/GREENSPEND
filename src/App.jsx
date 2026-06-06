@@ -1,18 +1,24 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 const transactions = [
-  { id:1, merchant:"Bolt Electric",      category:"Transport",  type:"green",   amount:24.50, date:"Today",      ref:"EV charge Whitechapel",      co2:-0.8,  icon:"⚡" },
-  { id:2, merchant:"Tesco Organic",      category:"Groceries",  type:"green",   amount:61.20, date:"Today",      ref:"Weekly shop",                 co2:-1.2,  icon:"🌿" },
-  { id:3, merchant:"Shell Petrol",       category:"Transport",  type:"harmful", amount:78.00, date:"Yesterday",  ref:"Fuel — M25",                  co2:18.4,  icon:"⛽" },
-  { id:4, merchant:"Zara",              category:"Fashion",    type:"harmful", amount:95.00, date:"Yesterday",  ref:"Fast fashion purchase",        co2:12.1,  icon:"👕" },
-  { id:5, merchant:"Oatly Café",         category:"Food",       type:"green",   amount:8.40,  date:"Mon",        ref:"Coffee oat milk",              co2:-0.2,  icon:"☕" },
-  { id:6, merchant:"British Gas",       category:"Energy",     type:"neutral", amount:112.00,date:"Mon",        ref:"Monthly energy direct debit",  co2:4.2,   icon:"🔥" },
-  { id:7, merchant:"Patagonia",         category:"Fashion",    type:"green",   amount:85.00, date:"Sun",        ref:"Recycled jacket",              co2:-2.1,  icon:"🧥" },
-  { id:8, merchant:"Ryanair",           category:"Travel",     type:"harmful", amount:143.00,date:"Sun",        ref:"Flight LHR-BCN",               co2:142.0, icon:"✈️" },
-  { id:9, merchant:"Octopus Energy",    category:"Energy",     type:"green",   amount:89.00, date:"Sat",        ref:"100% renewable tariff",        co2:-5.4,  icon:"🐙" },
-  { id:10,merchant:"McDonald's",        category:"Food",       type:"harmful", amount:12.80, date:"Sat",        ref:"Lunch",                        co2:3.8,   icon:"🍔" },
-  { id:11,merchant:"Monzo Savings Pot", category:"Finance",    type:"neutral", amount:200.00,date:"Fri",        ref:"Monthly savings transfer",     co2:0,     icon:"💰" },
-  { id:12,merchant:"Too Good To Go",    category:"Food",       type:"green",   amount:3.50,  date:"Fri",        ref:"Surplus food bag",             co2:-1.8,  icon:"🥗" },
+  { id:1,  merchant:"Bolt Electric",      category:"Transport",  type:"green",    amount:24.50,  ref:"EV charge Whitechapel",        co2:-0.8,   icon:"⚡" },
+  { id:2,  merchant:"Tesco Organic",      category:"Groceries",  type:"green",    amount:61.20,  ref:"Weekly shop",                  co2:-1.2,   icon:"🌿" },
+  { id:3,  merchant:"Shell Petrol",       category:"Transport",  type:"harmful",  amount:78.00,  ref:"Fuel — M25",                   co2:18.4,   icon:"⛽" },
+  { id:4,  merchant:"Zara",               category:"Fashion",    type:"harmful",  amount:95.00,  ref:"Fast fashion purchase",         co2:12.1,   icon:"👕" },
+  { id:5,  merchant:"Oatly Café",         category:"Food",       type:"green",    amount:8.40,   ref:"Coffee oat milk",              co2:-0.2,   icon:"☕" },
+  { id:6,  merchant:"British Gas",        category:"Energy",     type:"neutral",  amount:112.00, ref:"Monthly energy direct debit",   co2:4.2,    icon:"🔥" },
+  { id:7,  merchant:"WWF Donation",       category:"Charity",    type:"donation", amount:25.00,  ref:"Monthly charity donation",      co2:-3.5,   icon:"🐼" },
+  { id:8,  merchant:"Patagonia",          category:"Fashion",    type:"green",    amount:85.00,  ref:"Recycled jacket",              co2:-2.1,   icon:"🧥" },
+  { id:9,  merchant:"Ryanair",            category:"Travel",     type:"harmful",  amount:143.00, ref:"Flight LHR-BCN",               co2:142.0,  icon:"✈️" },
+  { id:10, merchant:"ATM Withdrawal",     category:"Cash",       type:"neutral",  amount:50.00,  ref:"Cash withdrawal — Barclays",   co2:0,      icon:"🏧" },
+  { id:11, merchant:"Octopus Energy",     category:"Energy",     type:"green",    amount:89.00,  ref:"100% renewable tariff",        co2:-5.4,   icon:"🐙" },
+  { id:12, merchant:"Oxfam Donation",     category:"Charity",    type:"donation", amount:10.00,  ref:"One-off charity donation",     co2:-1.8,   icon:"❤️" },
+  { id:13, merchant:"McDonald's",         category:"Food",       type:"harmful",  amount:12.80,  ref:"Lunch",                       co2:3.8,    icon:"🍔" },
+  { id:14, merchant:"ATM Withdrawal",     category:"Cash",       type:"neutral",  amount:100.00, ref:"Cash withdrawal — HSBC",       co2:0,      icon:"🏧" },
+  { id:15, merchant:"Monzo Savings Pot",  category:"Finance",    type:"neutral",  amount:200.00, ref:"Monthly savings transfer",     co2:0,      icon:"💰" },
+  { id:16, merchant:"Too Good To Go",     category:"Food",       type:"green",    amount:3.50,   ref:"Surplus food bag",             co2:-1.8,   icon:"🥗" },
+  { id:17, merchant:"Cancer Research UK", category:"Charity",    type:"donation", amount:15.00,  ref:"Standing order — charity",     co2:-2.2,   icon:"🎗️" },
+  { id:18, merchant:"ATM Withdrawal",     category:"Cash",       type:"neutral",  amount:20.00,  ref:"Cash withdrawal — Santander",  co2:0,      icon:"🏧" },
 ];
 
 const COLORS = {
@@ -26,6 +32,7 @@ const COLORS = {
   bg:      "#0D1F16",
   card:    "#162B1E",
   border:  "#2D6A4F44",
+  purple:  "#7C3AED",
 };
 
 function ScoreRing({ score }) {
@@ -62,10 +69,11 @@ function ScoreRing({ score }) {
 
 function Tag({ type }) {
   const cfg = {
-    green:   { bg:"#14532D", color:"#86EFAC", label:"🌿 Green" },
-    harmful: { bg:"#450A0A", color:"#FCA5A5", label:"⚠️ Harmful" },
-    neutral: { bg:"#1C1F26", color:"#9CA3AF", label:"◦ Neutral" },
-  }[type];
+    green:    { bg:"#14532D",  color:"#86EFAC", label:"🌿 Green"    },
+    harmful:  { bg:"#450A0A",  color:"#FCA5A5", label:"⚠️ Harmful"  },
+    neutral:  { bg:"#1C1F26",  color:"#9CA3AF", label:"◦ Neutral"   },
+    donation: { bg:"#3B0764",  color:"#E9D5FF", label:"💜 Donation" },
+  }[type] || { bg:"#1C1F26", color:"#9CA3AF", label:"◦ Neutral" };
   return (
     <span style={{ background:cfg.bg, color:cfg.color, fontSize:10, padding:"2px 8px", borderRadius:20, fontWeight:600, whiteSpace:"nowrap" }}>
       {cfg.label}
@@ -76,8 +84,8 @@ function Tag({ type }) {
 function CO2Badge({ co2 }) {
   const pos = co2 > 0;
   return (
-    <span style={{ fontSize:11, color: pos ? "#FCA5A5" : "#86EFAC", fontWeight:600, whiteSpace:"nowrap" }}>
-      {pos ? "+" : ""}{co2 > 0 ? co2.toFixed(1) : co2 === 0 ? "0" : co2.toFixed(1)} kg CO₂
+    <span style={{ fontSize:11, color: pos ? "#FCA5A5" : co2 === 0 ? "#9CA3AF" : "#86EFAC", fontWeight:600, whiteSpace:"nowrap" }}>
+      {pos ? "+" : ""}{co2 === 0 ? "0" : co2.toFixed(1)} kg CO₂
     </span>
   );
 }
@@ -111,28 +119,32 @@ export default function GreenSpend() {
   const [filter, setFilter] = useState("all");
   const [alertDismissed, setAlertDismissed] = useState(false);
 
-  const score = 67;
+  const score = 71;
   const totalCO2 = transactions.reduce((a, t) => a + t.co2, 0);
   const greenSpend = transactions.filter(t => t.type === "green").reduce((a,t) => a+t.amount, 0);
   const harmfulSpend = transactions.filter(t => t.type === "harmful").reduce((a,t) => a+t.amount, 0);
+  const donationSpend = transactions.filter(t => t.type === "donation").reduce((a,t) => a+t.amount, 0);
+  const atmSpend = transactions.filter(t => t.category === "Cash").reduce((a,t) => a+t.amount, 0);
   const totalSpend = transactions.reduce((a,t) => a+t.amount, 0);
 
   const categoryNet = [
-    { label:"Travel",    value: 142.0 },
-    { label:"Fashion",   value: 10.0  },
-    { label:"Food",      value: 1.8   },
-    { label:"Energy",    value:-1.2   },
-    { label:"Transport", value:-1.6   },
-    { label:"Groceries", value:-1.2   },
+    { label:"Travel",    value: 142.0  },
+    { label:"Fashion",   value: 10.0   },
+    { label:"Food",      value: 1.8    },
+    { label:"Energy",    value:-1.2    },
+    { label:"Transport", value:-1.6    },
+    { label:"Groceries", value:-1.2    },
+    { label:"Charity",   value:-7.5    },
+    { label:"Cash/ATM",  value: 0      },
   ];
 
   const filteredTx = filter === "all" ? transactions : transactions.filter(t => t.type === filter);
 
   const navItems = [
-    { id:"dashboard", label:"Dashboard", icon:"📊" },
-    { id:"transactions", label:"Payments",    icon:"💳" },
-    { id:"carbon",   label:"Carbon",    icon:"🌍" },
-    { id:"rewards",  label:"Rewards",   icon:"⭐" },
+    { id:"dashboard",    label:"Dashboard", icon:"📊" },
+    { id:"transactions", label:"Payments",  icon:"💳" },
+    { id:"carbon",       label:"Carbon",    icon:"🌍" },
+    { id:"rewards",      label:"Rewards",   icon:"⭐" },
   ];
 
   return (
@@ -160,13 +172,11 @@ export default function GreenSpend() {
         <p style={{ fontSize:12, color:"#6B9E80", margin:0 }}>Your green financial score platform</p>
       </div>
 
-      {/* Main content */}
       <div style={{ padding:"0 16px 80px" }}>
 
-        {/* DASHBOARD TAB */}
+        {/* DASHBOARD */}
         {tab === "dashboard" && (
           <div>
-            {/* Greenwashing alert */}
             {!alertDismissed && (
               <div style={{ background:"#451A03", border:"1px solid #F59E0B44", borderRadius:14, padding:"12px 14px", marginBottom:14, display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                 <div>
@@ -178,11 +188,11 @@ export default function GreenSpend() {
             )}
 
             {/* Score card */}
-            <div style={{ background:`linear-gradient(135deg, ${COLORS.forest}, ${COLORS.moss})`, borderRadius:20, padding:"20px 20px", marginBottom:14, border:`1px solid ${COLORS.sage}33`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ background:`linear-gradient(135deg, ${COLORS.forest}, ${COLORS.moss})`, borderRadius:20, padding:"20px", marginBottom:14, border:`1px solid ${COLORS.sage}33`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div>
                 <div style={{ fontSize:11, color:COLORS.sage, letterSpacing:"0.08em", fontWeight:600, marginBottom:6 }}>GREEN FINANCIAL SCORE</div>
-                <div style={{ fontSize:11, color:"#B7E4C7", marginBottom:14, maxWidth:160, lineHeight:1.5 }}>You're doing better than 58% of users this month</div>
-                <div style={{ display:"flex", gap:8 }}>
+                <div style={{ fontSize:11, color:"#B7E4C7", marginBottom:14, maxWidth:160, lineHeight:1.5 }}>You're doing better than 63% of users this month</div>
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                   <div style={{ background:"#14532D", borderRadius:10, padding:"6px 12px", textAlign:"center" }}>
                     <div style={{ fontSize:13, fontWeight:700, color:"#86EFAC" }}>£{greenSpend.toFixed(0)}</div>
                     <div style={{ fontSize:9, color:"#52B788" }}>Green spend</div>
@@ -196,12 +206,12 @@ export default function GreenSpend() {
               <ScoreRing score={score} />
             </div>
 
-            {/* CO2 summary */}
+            {/* Stats row */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
               {[
-                { label:"Net CO₂", value:`+${totalCO2.toFixed(1)}kg`, color:"#FCA5A5", sub:"this month" },
-                { label:"Green %", value:`${Math.round(greenSpend/totalSpend*100)}%`, color:COLORS.sage, sub:"of spending" },
-                { label:"Saved", value:"14.5kg", color:COLORS.gold, sub:"vs last month" },
+                { label:"Net CO₂",   value:`+${totalCO2.toFixed(1)}kg`, color:"#FCA5A5", sub:"this month" },
+                { label:"Green %",   value:`${Math.round(greenSpend/totalSpend*100)}%`, color:COLORS.sage, sub:"of spending" },
+                { label:"Donated",   value:`£${donationSpend.toFixed(0)}`, color:"#E9D5FF", sub:"to charity" },
               ].map((s, i) => (
                 <div key={i} style={{ background:COLORS.card, borderRadius:14, padding:"12px 10px", border:`1px solid ${COLORS.border}`, textAlign:"center" }}>
                   <div style={{ fontSize:16, fontWeight:700, color:s.color, fontFamily:"Georgia,serif" }}>{s.value}</div>
@@ -211,23 +221,38 @@ export default function GreenSpend() {
               ))}
             </div>
 
+            {/* Charity & ATM summary */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
+              <div style={{ background:"#1E0A3C", border:"1px solid #7C3AED44", borderRadius:14, padding:"12px 14px" }}>
+                <div style={{ fontSize:18, marginBottom:4 }}>💜</div>
+                <div style={{ fontSize:15, fontWeight:700, color:"#E9D5FF", fontFamily:"Georgia,serif" }}>£{donationSpend.toFixed(0)}</div>
+                <div style={{ fontSize:10, color:"#A78BFA", marginTop:2 }}>Charity donations</div>
+                <div style={{ fontSize:9, color:"#7C3AED", marginTop:2 }}>3 causes supported</div>
+              </div>
+              <div style={{ background:"#162030", border:"1px solid #6B728044", borderRadius:14, padding:"12px 14px" }}>
+                <div style={{ fontSize:18, marginBottom:4 }}>🏧</div>
+                <div style={{ fontSize:15, fontWeight:700, color:"#D1FAE5", fontFamily:"Georgia,serif" }}>£{atmSpend.toFixed(0)}</div>
+                <div style={{ fontSize:10, color:"#9CA3AF", marginTop:2 }}>ATM withdrawals</div>
+                <div style={{ fontSize:9, color:"#6B7280", marginTop:2 }}>Low confidence score</div>
+              </div>
+            </div>
+
             {/* Recent payments */}
             <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, overflow:"hidden", marginBottom:14 }}>
               <div style={{ padding:"14px 16px 10px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <span style={{ fontSize:13, fontWeight:600, color:"#D1FAE5" }}>Recent Payments</span>
                 <button onClick={() => setTab("transactions")} style={{ background:"none", border:"none", color:COLORS.sage, fontSize:11, cursor:"pointer" }}>See all →</button>
               </div>
-              {transactions.slice(0,5).map((tx, i) => (
-                <div key={tx.id} onClick={() => { setSelectedTx(tx); }} style={{
+              {transactions.slice(0,6).map((tx, i) => (
+                <div key={tx.id} style={{
                   display:"flex", alignItems:"center", gap:12, padding:"10px 16px",
                   borderTop:`1px solid ${COLORS.border}`, cursor:"pointer",
                   background: selectedTx?.id === tx.id ? "#1F3A2A" : "transparent",
-                  transition:"background 0.15s"
                 }}>
                   <div style={{ width:36, height:36, borderRadius:10, background:COLORS.forest, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>{tx.icon}</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:12, fontWeight:600, color:"#D1FAE5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{tx.merchant}</div>
-                    <div style={{ fontSize:10, color:"#6B9E80" }}>{tx.date} · {tx.category}</div>
+                    <div style={{ fontSize:10, color:"#6B9E80" }}>{tx.category}</div>
                   </div>
                   <div style={{ textAlign:"right", flexShrink:0 }}>
                     <div style={{ fontSize:12, fontWeight:600, color:"#E5F5EC" }}>£{tx.amount.toFixed(2)}</div>
@@ -237,13 +262,13 @@ export default function GreenSpend() {
               ))}
             </div>
 
-            {/* Green tips */}
+            {/* Green swaps */}
             <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, padding:"14px 16px" }}>
               <div style={{ fontSize:13, fontWeight:600, color:"#D1FAE5", marginBottom:10 }}>💡 Green Swaps for You</div>
               {[
-                { from:"Shell Petrol", to:"Pod Point EV Charge", save:"18.4kg CO₂", icon:"⚡" },
-                { from:"McDonald's", to:"Too Good To Go", save:"3.8kg CO₂", icon:"🥗" },
-                { from:"Zara", to:"Vinted / Depop", save:"12.1kg CO₂", icon:"♻️" },
+                { from:"Shell Petrol",  to:"Pod Point EV Charge", save:"18.4kg CO₂", icon:"⚡" },
+                { from:"McDonald's",    to:"Too Good To Go",       save:"3.8kg CO₂",  icon:"🥗" },
+                { from:"Cash/ATM",      to:"Contactless payment",  save:"Track spend", icon:"📲" },
               ].map((tip, i) => (
                 <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderTop: i>0 ? `1px solid ${COLORS.border}` : "none" }}>
                   <span style={{ fontSize:20 }}>{tip.icon}</span>
@@ -251,36 +276,53 @@ export default function GreenSpend() {
                     <div style={{ fontSize:11, color:"#9CA3AF" }}>Switch <span style={{ color:"#FCA5A5" }}>{tip.from}</span></div>
                     <div style={{ fontSize:11, color:"#86EFAC" }}>→ {tip.to}</div>
                   </div>
-                  <div style={{ fontSize:11, color:COLORS.sage, fontWeight:600 }}>-{tip.save}</div>
+                  <div style={{ fontSize:11, color:COLORS.sage, fontWeight:600 }}>{tip.save}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* TRANSACTIONS TAB */}
+        {/* PAYMENTS TAB */}
         {tab === "transactions" && (
           <div>
             <div style={{ paddingTop:16, marginBottom:12 }}>
               <div style={{ fontSize:16, fontWeight:700, fontFamily:"Georgia,serif", color:"#86EFAC", marginBottom:12 }}>Payment History</div>
               <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                {["all","green","neutral","harmful"].map(f => (
+                {["all","green","donation","neutral","harmful"].map(f => (
                   <button key={f} onClick={() => setFilter(f)} style={{
-                    padding:"5px 12px", borderRadius:20, border:`1px solid ${filter===f ? COLORS.sage : COLORS.border}`,
-                    background: filter===f ? COLORS.forest : "transparent",
-                    color: filter===f ? "#86EFAC" : "#6B9E80", fontSize:11, cursor:"pointer", fontWeight:600, textTransform:"capitalize"
-                  }}>{f === "all" ? "All payments" : f}</button>
+                    padding:"5px 12px", borderRadius:20,
+                    border:`1px solid ${filter===f ? (f==="donation" ? "#7C3AED" : COLORS.sage) : COLORS.border}`,
+                    background: filter===f ? (f==="donation" ? "#3B0764" : COLORS.forest) : "transparent",
+                    color: filter===f ? (f==="donation" ? "#E9D5FF" : "#86EFAC") : "#6B9E80",
+                    fontSize:11, cursor:"pointer", fontWeight:600, textTransform:"capitalize"
+                  }}>
+                    {f === "all" ? "All" : f === "donation" ? "💜 Donations" : f === "neutral" ? "ATM & Other" : f}
+                  </button>
                 ))}
               </div>
             </div>
+
+            {/* Charity & ATM totals */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
+              <div style={{ background:"#1E0A3C", border:"1px solid #7C3AED44", borderRadius:12, padding:"10px 12px" }}>
+                <div style={{ fontSize:11, color:"#A78BFA", marginBottom:2 }}>💜 Total donated</div>
+                <div style={{ fontSize:16, fontWeight:700, color:"#E9D5FF" }}>£{donationSpend.toFixed(2)}</div>
+              </div>
+              <div style={{ background:"#162030", border:"1px solid #6B728044", borderRadius:12, padding:"10px 12px" }}>
+                <div style={{ fontSize:11, color:"#9CA3AF", marginBottom:2 }}>🏧 ATM total</div>
+                <div style={{ fontSize:16, fontWeight:700, color:"#D1FAE5" }}>£{atmSpend.toFixed(2)}</div>
+              </div>
+            </div>
+
             <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, overflow:"hidden" }}>
               {filteredTx.map((tx, i) => (
                 <div key={tx.id} onClick={() => setSelectedTx(selectedTx?.id === tx.id ? null : tx)} style={{
                   padding:"12px 16px", borderTop: i>0 ? `1px solid ${COLORS.border}` : "none",
-                  cursor:"pointer", background: selectedTx?.id === tx.id ? "#1F3A2A" : "transparent", transition:"background 0.15s"
+                  cursor:"pointer", background: selectedTx?.id === tx.id ? "#1F3A2A" : "transparent",
                 }}>
                   <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                    <div style={{ width:40, height:40, borderRadius:12, background:COLORS.forest, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{tx.icon}</div>
+                    <div style={{ width:40, height:40, borderRadius:12, background:tx.type==="donation" ? "#2E1065" : COLORS.forest, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{tx.icon}</div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:600, color:"#D1FAE5" }}>{tx.merchant}</div>
                       <div style={{ fontSize:10, color:"#6B9E80", marginTop:1 }}>{tx.ref}</div>
@@ -291,16 +333,18 @@ export default function GreenSpend() {
                     </div>
                     <div style={{ textAlign:"right", flexShrink:0 }}>
                       <div style={{ fontSize:14, fontWeight:700, color:"#E5F5EC" }}>£{tx.amount.toFixed(2)}</div>
-                      <div style={{ fontSize:10, color:"#6B9E80" }}>{tx.date}</div>
+                      <div style={{ fontSize:10, color:"#6B9E80" }}>{tx.category}</div>
                     </div>
                   </div>
                   {selectedTx?.id === tx.id && (
                     <div style={{ marginTop:12, background:COLORS.bg, borderRadius:10, padding:"10px 12px", fontSize:11, color:"#B7E4C7", lineHeight:1.6 }}>
                       <div><b style={{ color:COLORS.sage }}>Category:</b> {tx.category}</div>
                       <div><b style={{ color:COLORS.sage }}>Carbon impact:</b> <CO2Badge co2={tx.co2} /></div>
-                      <div><b style={{ color:COLORS.sage }}>Payment ref:</b> {tx.ref}</div>
-                      {tx.type === "harmful" && <div style={{ marginTop:6, color:"#FCA5A5" }}>⚠️ This payment adds to your carbon footprint. Consider a greener alternative.</div>}
+                      <div><b style={{ color:COLORS.sage }}>Reference:</b> {tx.ref}</div>
+                      {tx.type === "donation" && <div style={{ marginTop:6, color:"#E9D5FF" }}>💜 Thank you for donating! Charity contributions boost your Green Financial Score.</div>}
+                      {tx.type === "harmful" && <div style={{ marginTop:6, color:"#FCA5A5" }}>⚠️ This payment increases your carbon footprint. Consider a greener alternative.</div>}
                       {tx.type === "green" && <div style={{ marginTop:6, color:"#86EFAC" }}>✅ Great choice — this payment reduces your carbon score.</div>}
+                      {tx.category === "Cash" && <div style={{ marginTop:6, color:"#9CA3AF" }}>🏧 ATM withdrawals are scored as low-confidence — we can't track how cash is spent.</div>}
                     </div>
                   )}
                 </div>
@@ -317,25 +361,22 @@ export default function GreenSpend() {
               <div style={{ fontSize:11, color:"#6B9E80" }}>Based on your payment transactions this month</div>
             </div>
 
-            {/* Total CO2 big display */}
             <div style={{ background:`linear-gradient(135deg,${COLORS.forest},${COLORS.moss})`, borderRadius:20, padding:"20px", marginBottom:14, border:`1px solid ${COLORS.sage}33`, textAlign:"center" }}>
               <div style={{ fontSize:11, color:COLORS.sage, letterSpacing:"0.1em", fontWeight:600, marginBottom:6 }}>TOTAL NET CO₂ THIS MONTH</div>
               <div style={{ fontSize:52, fontWeight:700, color:"#FCA5A5", fontFamily:"Georgia,serif", lineHeight:1 }}>+{totalCO2.toFixed(1)}</div>
               <div style={{ fontSize:14, color:"#D1FAE5", marginTop:4 }}>kg CO₂ equivalent</div>
               <div style={{ marginTop:12, fontSize:11, color:"#B7E4C7", lineHeight:1.5 }}>
-                That's equivalent to driving <b style={{ color:COLORS.gold }}>864km</b> in a petrol car, or<br/>
-                <b style={{ color:COLORS.sage }}>14 flights</b> less than the average UK consumer
+                Your charity donations offset <b style={{ color:"#E9D5FF" }}>7.5kg CO₂</b> this month<br/>
+                ATM withdrawals are <b style={{ color:"#9CA3AF" }}>untracked</b> — use card to improve your score
               </div>
             </div>
 
-            {/* By category */}
             <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, padding:"16px", marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:600, color:"#D1FAE5", marginBottom:12 }}>Net CO₂ by Category</div>
               <BarChart data={categoryNet} />
             </div>
 
-            {/* Breakdown */}
-            <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, padding:"14px 16px" }}>
+            <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, padding:"14px 16px", marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:600, color:"#D1FAE5", marginBottom:10 }}>Biggest Offenders</div>
               {transactions.filter(t => t.co2 > 0).sort((a,b) => b.co2 - a.co2).slice(0,4).map((tx, i) => (
                 <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderTop: i>0 ? `1px solid ${COLORS.border}` : "none" }}>
@@ -350,6 +391,12 @@ export default function GreenSpend() {
                 </div>
               ))}
             </div>
+
+            {/* ATM note */}
+            <div style={{ background:"#162030", border:"1px solid #6B728044", borderRadius:14, padding:"12px 14px" }}>
+              <div style={{ fontSize:12, fontWeight:600, color:"#9CA3AF", marginBottom:4 }}>🏧 About ATM Withdrawals</div>
+              <div style={{ fontSize:11, color:"#6B7280", lineHeight:1.5 }}>Cash withdrawals are marked as low-confidence — GreenSpend can't track how cash is spent. Using contactless or card payments helps us give you a more accurate carbon score. You withdrew <b style={{ color:"#D1FAE5" }}>£{atmSpend.toFixed(0)}</b> in cash this month.</div>
+            </div>
           </div>
         )}
 
@@ -358,57 +405,78 @@ export default function GreenSpend() {
           <div>
             <div style={{ paddingTop:16, marginBottom:14 }}>
               <div style={{ fontSize:16, fontWeight:700, fontFamily:"Georgia,serif", color:"#86EFAC", marginBottom:4 }}>Rewards & Badges</div>
-              <div style={{ fontSize:11, color:"#6B9E80" }}>Earn points for every green payment you make</div>
+              <div style={{ fontSize:11, color:"#6B9E80" }}>Earn points for green payments and charity donations</div>
             </div>
 
-            {/* Points */}
             <div style={{ background:`linear-gradient(135deg, ${COLORS.forest}, ${COLORS.moss})`, borderRadius:20, padding:20, marginBottom:14, border:`1px solid ${COLORS.sage}33`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div>
                 <div style={{ fontSize:11, color:COLORS.sage, letterSpacing:"0.08em", fontWeight:600, marginBottom:4 }}>GREEN POINTS</div>
-                <div style={{ fontSize:48, fontWeight:700, color:COLORS.gold, fontFamily:"Georgia,serif", lineHeight:1 }}>1,240</div>
-                <div style={{ fontSize:11, color:"#B7E4C7", marginTop:4 }}>260 pts until next reward</div>
+                <div style={{ fontSize:48, fontWeight:700, color:COLORS.gold, fontFamily:"Georgia,serif", lineHeight:1 }}>1,540</div>
+                <div style={{ fontSize:11, color:"#B7E4C7", marginTop:4 }}>+300 pts from donations this month</div>
                 <div style={{ marginTop:8, background:"#1B4332", borderRadius:8, height:6, width:180, overflow:"hidden" }}>
-                  <div style={{ width:"82%", height:"100%", background:COLORS.sage, borderRadius:8 }}/>
+                  <div style={{ width:"88%", height:"100%", background:COLORS.sage, borderRadius:8 }}/>
                 </div>
               </div>
               <div style={{ fontSize:56 }}>🏆</div>
             </div>
 
-            {/* Badges */}
+            {/* Charity impact */}
+            <div style={{ background:"#1E0A3C", border:"1px solid #7C3AED44", borderRadius:16, padding:"14px 16px", marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:"#E9D5FF", marginBottom:10 }}>💜 Your Charity Impact</div>
+              {[
+                { icon:"🐼", name:"WWF",              amount:"£25.00", desc:"Wildlife conservation" },
+                { icon:"❤️", name:"Oxfam",            amount:"£10.00", desc:"Poverty relief" },
+                { icon:"🎗️", name:"Cancer Research UK",amount:"£15.00", desc:"Medical research" },
+              ].map((c, i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderTop: i>0 ? `1px solid #7C3AED33` : "none" }}>
+                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                    <span style={{ fontSize:20 }}>{c.icon}</span>
+                    <div>
+                      <div style={{ fontSize:12, color:"#E9D5FF", fontWeight:600 }}>{c.name}</div>
+                      <div style={{ fontSize:10, color:"#A78BFA" }}>{c.desc}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#E9D5FF" }}>{c.amount}</div>
+                </div>
+              ))}
+              <div style={{ marginTop:10, background:"#2E1065", borderRadius:10, padding:"8px 12px", textAlign:"center" }}>
+                <div style={{ fontSize:11, color:"#A78BFA" }}>Total donated this month</div>
+                <div style={{ fontSize:20, fontWeight:700, color:"#E9D5FF", fontFamily:"Georgia,serif" }}>£{donationSpend.toFixed(2)}</div>
+              </div>
+            </div>
+
             <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, padding:"14px 16px", marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:600, color:"#D1FAE5", marginBottom:12 }}>Your Badges</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                 {[
-                  { icon:"⚡", label:"EV Champion",     desc:"3 EV charges this month",  earned:true  },
-                  { icon:"🌿", label:"Plant-Based",      desc:"5 organic purchases",       earned:true  },
-                  { icon:"♻️", label:"Circular Shopper", desc:"Buy second-hand 3× ",       earned:true  },
-                  { icon:"✈️", label:"Flight-Free",      desc:"No flights for 30 days",    earned:false },
-                  { icon:"🔋", label:"Energy Saver",     desc:"Switch to 100% renewable",  earned:true  },
-                  { icon:"🍔", label:"Meat Reducer",     desc:"5 plant-based meals",       earned:false },
+                  { icon:"⚡", label:"EV Champion",      desc:"3 EV charges",          earned:true  },
+                  { icon:"💜", label:"Charity Hero",      desc:"Donated to 3 causes",   earned:true  },
+                  { icon:"♻️", label:"Circular Shopper",  desc:"Buy second-hand 3×",    earned:true  },
+                  { icon:"🏧", label:"Cash-Free",         desc:"No ATM for 30 days",    earned:false },
+                  { icon:"🔋", label:"Energy Saver",      desc:"100% renewable",        earned:true  },
+                  { icon:"🍔", label:"Meat Reducer",      desc:"5 plant-based meals",   earned:false },
                 ].map((b, i) => (
                   <div key={i} style={{
-                    background: b.earned ? COLORS.forest : "#111A14",
-                    border:`1px solid ${b.earned ? COLORS.sage+"55" : COLORS.border}`,
-                    borderRadius:14, padding:"12px", textAlign:"center",
-                    opacity: b.earned ? 1 : 0.5
+                    background: b.earned ? (b.label==="Charity Hero" ? "#2E1065" : COLORS.forest) : "#111A14",
+                    border:`1px solid ${b.earned ? (b.label==="Charity Hero" ? "#7C3AED55" : COLORS.sage+"55") : COLORS.border}`,
+                    borderRadius:14, padding:"12px", textAlign:"center", opacity: b.earned ? 1 : 0.5
                   }}>
                     <div style={{ fontSize:28, marginBottom:4 }}>{b.icon}</div>
-                    <div style={{ fontSize:11, fontWeight:700, color: b.earned ? "#86EFAC" : "#6B9E80" }}>{b.label}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color: b.earned ? (b.label==="Charity Hero" ? "#E9D5FF" : "#86EFAC") : "#6B9E80" }}>{b.label}</div>
                     <div style={{ fontSize:9, color:"#4B7060", marginTop:2, lineHeight:1.3 }}>{b.desc}</div>
-                    {b.earned && <div style={{ marginTop:6, fontSize:9, color:COLORS.sage, fontWeight:600 }}>✓ EARNED</div>}
+                    {b.earned && <div style={{ marginTop:6, fontSize:9, color: b.label==="Charity Hero" ? "#A78BFA" : COLORS.sage, fontWeight:600 }}>✓ EARNED</div>}
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Rewards to redeem */}
             <div style={{ background:COLORS.card, borderRadius:16, border:`1px solid ${COLORS.border}`, padding:"14px 16px" }}>
               <div style={{ fontSize:13, fontWeight:600, color:"#D1FAE5", marginBottom:10 }}>Redeem Rewards</div>
               {[
-                { icon:"🌳", label:"Plant a tree",              pts:500,  available:true  },
-                { icon:"💚", label:"£5 Patagonia discount",     pts:800,  available:true  },
-                { icon:"🚲", label:"Free Lime e-bike ride",     pts:600,  available:true  },
-                { icon:"☀️", label:"Solar panel consultation",  pts:1500, available:false },
+                { icon:"🌳", label:"Plant a tree",            pts:500,  available:true  },
+                { icon:"💚", label:"£5 Patagonia discount",   pts:800,  available:true  },
+                { icon:"💜", label:"Match your donation",     pts:600,  available:true  },
+                { icon:"☀️", label:"Solar panel consult",     pts:1500, available:false },
               ].map((r, i) => (
                 <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderTop: i>0 ? `1px solid ${COLORS.border}` : "none" }}>
                   <div style={{ display:"flex", gap:10, alignItems:"center" }}>
@@ -422,7 +490,8 @@ export default function GreenSpend() {
                     background: r.available ? COLORS.forest : "transparent",
                     border:`1px solid ${r.available ? COLORS.sage : COLORS.border}`,
                     color: r.available ? "#86EFAC" : "#4B7060",
-                    fontSize:11, padding:"5px 12px", borderRadius:20, cursor: r.available ? "pointer" : "default", fontWeight:600
+                    fontSize:11, padding:"5px 12px", borderRadius:20,
+                    cursor: r.available ? "pointer" : "default", fontWeight:600
                   }}>
                     {r.available ? "Redeem" : "Locked"}
                   </button>
