@@ -222,7 +222,7 @@ export default function GreenSpend() {
     const params = new URLSearchParams({
       response_type: "code",
       client_id: "sandbox-greenspend-a080fd",
-      scope: "info accounts balance transactions",
+      scope: "info accounts balance transactions offline_access",
       redirect_uri: "https://greenspend.vercel.app/api/auth/callback",
       providers: "uk-ob-all uk-oauth-all",
     });
