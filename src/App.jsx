@@ -6,7 +6,8 @@ import {
   LayoutDashboard, CreditCard, Calculator, Globe, Sprout,
   TrendingUp, TrendingDown, Gift, Trophy, Circle,
   ShieldCheck, AlertTriangle, ArrowDownToLine, ChevronDown,
-  Activity, RefreshCw, ToggleLeft, ToggleRight, ArrowRight
+  Activity, RefreshCw, ToggleLeft, ToggleRight, ArrowRight,
+  Banknote, CheckCircle, Loader
 } from "lucide-react";
 
 // ── BEIS 2024 intensity factors ───────────────────────────────────────────────
@@ -62,7 +63,7 @@ function getType(cat) {
   return f < 0 ? "green" : "harmful";
 }
 
-// ── Raw transactions ──────────────────────────────────────────────────────────
+// ── Raw transactions (fallback / demo data) ───────────────────────────────────
 const RAW_TX = [
   { id:1,  merchant:"Bolt Electric",        cat:"ev_charging",         amt:24.50,  ref:"EV charge Whitechapel"       },
   { id:2,  merchant:"Tesco Organic",         cat:"organic_grocery",     amt:61.20,  ref:"Weekly shop"                 },
@@ -82,11 +83,11 @@ const RAW_TX = [
 
 // ── Green swap alternatives ───────────────────────────────────────────────────
 const SWAP_DEFS = [
-  { id:"s1", txId:3,  from:"Shell Petrol",  to:"Pod Point EV",       fromCat:"petrol",       toCat:"ev_charging"        },
-  { id:"s2", txId:4,  from:"Zara",          to:"Vinted second-hand", fromCat:"fast_fashion", toCat:"sustainable_fashion"},
-  { id:"s3", txId:9,  from:"Ryanair",       to:"Eurostar train",     fromCat:"flight",       toCat:"ev_charging"        },
-  { id:"s4", txId:12, from:"McDonald's",    to:"Too Good To Go",     fromCat:"fast_food",    toCat:"surplus_food"       },
-  { id:"s5", txId:6,  from:"British Gas",   to:"Octopus Energy",     fromCat:"gas_energy",   toCat:"renewable_energy"   },
+  { id:"s1", txId:3,  amt:78.00,  from:"Shell Petrol",  to:"Pod Point EV",       fromCat:"petrol",       toCat:"ev_charging"        },
+  { id:"s2", txId:4,  amt:95.00,  from:"Zara",          to:"Vinted second-hand", fromCat:"fast_fashion", toCat:"sustainable_fashion"},
+  { id:"s3", txId:9,  amt:143.00, from:"Ryanair",       to:"Eurostar train",     fromCat:"flight",       toCat:"ev_charging"        },
+  { id:"s4", txId:12, amt:12.80,  from:"McDonald's",    to:"Too Good To Go",     fromCat:"fast_food",    toCat:"surplus_food"       },
+  { id:"s5", txId:6,  amt:112.00, from:"British Gas",   to:"Octopus Energy",     fromCat:"gas_energy",   toCat:"renewable_energy"   },
 ];
 
 const COLORS = {
@@ -173,13 +174,79 @@ export default function GreenSpend() {
   const [openAlts, setOpenAlts]     = useState({});
   const [scoreCardOpen, setScoreCardOpen] = useState(false);
 
+  // ── TrueLayer state ───────────────────────────────────────────────────────
+  const [bankToken, setBankToken]         = useState(null);
+  const [bankConnected, setBankConnected] = useState(false);
+  const [bankLoading, setBankLoading]     = useState(false);
+  const [realTransactions, setRealTransactions] = useState([]);
+  const [bankError, setBankError]         = useState(null);
+
+  // ── On load: check if TrueLayer redirected back with a token ─────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token) {
+      setBankToken(token);
+      setBankConnected(true);
+      setBankLoading(true);
+      // Clean the token from the URL so it doesn't linger
+      window.history.replaceState({}, document.title, "/");
+      // Fetch real transactions from our backend
+      fetch(`/api/transactions?token=${token}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && Array.isArray(data)) {
+            // Map TrueLayer transactions to GreenSpend format
+            const mapped = data.slice(0, 20).map((tx, i) => ({
+              id: i + 100,
+              merchant: tx.merchant_name || tx.description || "Unknown",
+              cat: "neutral", // Will be replaced by AI categorisation later
+              amt: Math.abs(tx.amount),
+              ref: tx.description || "",
+              _raw: tx,
+            }));
+            setRealTransactions(mapped);
+          }
+          setBankLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to fetch transactions:", err);
+          setBankError("Could not load transactions. Please try reconnecting.");
+          setBankLoading(false);
+        });
+    }
+  }, []);
+
+  // ── Connect bank — redirects to TrueLayer auth ───────────────────────────
+  const connectBank = () => {
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: "e9697230-6dc0-48d4-b7ee-c846612ab252",
+      scope: "info accounts balance transactions",
+      redirect_uri: window.location.origin + "/api/auth/callback",
+      providers: "uk-ob-all uk-oauth-all",
+    });
+    window.location.href = `https://auth.truelayer-sandbox.com/?${params}`;
+  };
+
+  // ── Disconnect bank ───────────────────────────────────────────────────────
+  const disconnectBank = () => {
+    setBankToken(null);
+    setBankConnected(false);
+    setRealTransactions([]);
+    setBankError(null);
+  };
+
   useEffect(()=>{
     const t=setInterval(()=>setLiveIdx(i=>(i+1)%Object.keys(INTENSITY).length),1800);
     return ()=>clearInterval(t);
   },[]);
 
+  // ── Use real transactions if connected, otherwise demo data ──────────────
+  const sourceTx = bankConnected && realTransactions.length > 0 ? realTransactions : RAW_TX;
+
   // ── Compute derived stats with swaps applied ──────────────────────────────
-  const transactions = RAW_TX.map(tx=>{
+  const transactions = sourceTx.map(tx=>{
     const sw=swaps.find(s=>s.txId===tx.id&&s.enabled);
     const cat=sw?sw.toCat:tx.cat;
     return {...tx, activeCat:cat, co2:calcCO2(tx.amt,cat), type:getType(cat), swapped:!!sw, swapTo:sw?.to};
@@ -231,7 +298,7 @@ export default function GreenSpend() {
 
   return (
     <div style={{background:COLORS.bg,minHeight:"100vh",fontFamily:"'DM Sans',system-ui,sans-serif",color:"#E5F5EC",maxWidth:420,margin:"0 auto",boxShadow:"0 0 60px #00000066"}}>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}@keyframes glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 10px #52B78844}}`}</style>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}@keyframes glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 10px #52B78844}}@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
 
       {/* Header */}
       <div style={{padding:"22px 18px 10px",background:`linear-gradient(180deg,${COLORS.forest},${COLORS.bg})`}}>
@@ -254,6 +321,92 @@ export default function GreenSpend() {
         {/* ── DASHBOARD ─────────────────────────────────────────────────── */}
         {tab==="dashboard" && (
           <div>
+
+            {/* ── TRUELAYER BANK CONNECTION CARD ── */}
+            <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${bankConnected?"#52B78888":COLORS.border}`,padding:"12px 14px",marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <div style={{width:32,height:32,background:bankConnected?"#14532D":"#1A1C26",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {bankConnected
+                    ? <CheckCircle size={17} color="#86EFAC" strokeWidth={2}/>
+                    : <Banknote size={17} color="#6B9E80" strokeWidth={1.8}/>
+                  }
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#D1FAE5"}}>
+                    {bankConnected ? "Bank connected" : "Connect your bank"}
+                  </div>
+                  <div style={{fontSize:10,color:"#6B9E80",marginTop:1}}>
+                    {bankConnected
+                      ? bankLoading
+                        ? "Loading your transactions…"
+                        : `${realTransactions.length} real transactions loaded`
+                      : "Powered by TrueLayer open banking"}
+                  </div>
+                </div>
+                {bankConnected && !bankLoading && (
+                  <button onClick={disconnectBank} style={{background:"none",border:"none",color:"#6B9E80",fontSize:10,cursor:"pointer",padding:"4px 8px",borderRadius:8,border:`1px solid ${COLORS.border}`}}>
+                    Disconnect
+                  </button>
+                )}
+              </div>
+
+              {/* Error state */}
+              {bankError && (
+                <div style={{background:"#450A0A",borderRadius:10,padding:"8px 10px",marginBottom:8,fontSize:10,color:"#FCA5A5",display:"flex",alignItems:"center",gap:6}}>
+                  <AlertTriangle size={12} color="#FCA5A5"/>{bankError}
+                </div>
+              )}
+
+              {/* Loading spinner */}
+              {bankLoading && (
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0"}}>
+                  <Loader size={14} color={COLORS.sage} style={{animation:"spin 1s linear infinite"}}/>
+                  <span style={{fontSize:11,color:"#6B9E80"}}>Fetching transactions from your bank…</span>
+                </div>
+              )}
+
+              {/* Connect button — only show when not connected */}
+              {!bankConnected && (
+                <button
+                  onClick={connectBank}
+                  style={{
+                    width:"100%",
+                    background:COLORS.forest,
+                    border:`1px solid ${COLORS.sage}`,
+                    borderRadius:11,
+                    padding:"11px",
+                    fontSize:13,
+                    fontWeight:700,
+                    color:"#86EFAC",
+                    cursor:"pointer",
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"center",
+                    gap:8,
+                  }}
+                >
+                  <Banknote size={15} color="#86EFAC"/>
+                  Connect Bank Account
+                </button>
+              )}
+
+              {/* Live data badge */}
+              {bankConnected && !bankLoading && realTransactions.length > 0 && (
+                <div style={{display:"flex",alignItems:"center",gap:5,marginTop:6}}>
+                  <div style={{width:6,height:6,borderRadius:"50%",background:"#86EFAC",animation:"pulse 1.8s infinite"}}/>
+                  <span style={{fontSize:10,color:COLORS.sage,fontWeight:600}}>Showing real bank data</span>
+                  <span style={{fontSize:10,color:"#6B9E80"}}>— carbon scored live</span>
+                </div>
+              )}
+
+              {/* Demo mode badge */}
+              {!bankConnected && (
+                <div style={{fontSize:10,color:"#4B7060",marginTop:6,textAlign:"center"}}>
+                  Currently showing demo data · Connect to score real spending
+                </div>
+              )}
+            </div>
+
             {/* Greenwashing alert */}
             {!dismissed && (
               <div style={{background:"#451A03",border:"1px solid #F59E0B44",borderRadius:14,padding:"10px 12px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -298,7 +451,7 @@ export default function GreenSpend() {
                     </div>
                   )}
                 </div>
-                {/* Right side — ring on desktop, arrow indicator */}
+                {/* Right side — ring */}
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,flexShrink:0,marginLeft:10}}>
                   <ScoreRing score={score}/>
                   <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -676,7 +829,6 @@ export default function GreenSpend() {
                 const open = !!openAlts[idx];
                 return (
                   <div key={idx} style={{marginBottom:8,borderRadius:11,overflow:"hidden",border:`1px solid ${COLORS.border}`}}>
-                    {/* Header row — always visible */}
                     <div onClick={()=>setOpenAlts(p=>({...p,[idx]:!p[idx]}))} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 11px",cursor:"pointer",background:"#1B2A1E"}}>
                       <div style={{width:30,height:30,borderRadius:8,background:"#2E1A1A",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         <item.Icon size={14} color="#FCA5A5" strokeWidth={1.8}/>
@@ -687,7 +839,6 @@ export default function GreenSpend() {
                       </div>
                       <ChevronDown size={14} color="#6B9E80" style={{transition:"transform .3s",transform:open?"rotate(180deg)":"none",flexShrink:0}}/>
                     </div>
-                    {/* Alternatives — expand on tap */}
                     <div style={{maxHeight:open?"300px":"0",overflow:"hidden",transition:"max-height .35s ease"}}>
                       {item.alts.map((alt,ai)=>(
                         <div key={ai} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 11px",borderTop:`1px solid ${COLORS.border}`,background:"#0D1F16"}}>
