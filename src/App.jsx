@@ -223,7 +223,7 @@ export default function GreenSpend() {
       response_type: "code",
       client_id: "sandbox-greenspend-a080fd",
       scope: "info accounts balance transactions",
-      redirect_uri: window.location.origin + "/api/auth/callback",
+      redirect_uri: "https://greenspend.vercel.app/api/auth/callback",
       providers: "uk-ob-all uk-oauth-all",
     });
     window.location.href = `https://auth.truelayer-sandbox.com/?${params}`;
