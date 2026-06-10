@@ -221,7 +221,7 @@ export default function GreenSpend() {
   const connectBank = () => {
     const params = new URLSearchParams({
       response_type: "code",
-      client_id: "e9697230-6dc0-48d4-b7ee-c846612ab252",
+      client_id: "sandbox-greenspend-a080fd",",
       scope: "info accounts balance transactions",
       redirect_uri: window.location.origin + "/api/auth/callback",
       providers: "uk-ob-all uk-oauth-all",
