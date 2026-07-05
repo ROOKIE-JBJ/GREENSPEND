@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   const activityId = activityMap[category] || "consumer_goods-type_other";
 
   try {
-    const response = await fetch("https://beta3.api.climatiq.io/estimate", {
+    const response = await fetch("https://api.climatiq.io/data/v1/estimate", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.CLIMATIQ_API_KEY}`,
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         emission_factor: {
           activity_id: activityId,
-          data_version: "^21",
+          data_version: "^33",
         },
         parameters: {
           money: amount,
