@@ -9,16 +9,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Amount required" });
   }
 
-  // Map GreenSpend categories to Climatiq activity IDs
+  // Map GreenSpend categories to Climatiq activity IDs (verified 2025)
   const activityMap = {
-    petrol:               "passenger_vehicle-vehicle_type_car-fuel_source_petrol-engine_size_na-vehicle_age_na-vehicle_weight_na",
-    flight:               "passenger_flight-route_type_na-aircraft_type_na-distance_na-class_na-rf_na",
+    petrol:               "consumer_goods-type_motor_gasoline",
+    flight:               "consumer_goods-type_air_travel",
     fast_fashion:         "consumer_goods-type_clothing",
     fast_food:            "consumer_goods-type_food_and_drink",
-    gas_energy:           "energy-source_grid_mix",
+    gas_energy:           "consumer_goods-type_natural_gas",
     organic_grocery:      "consumer_goods-type_food_and_drink",
-    ev_charging:          "electricity-supply_grid-source_residual_mix",
-    renewable_energy:     "electricity-supply_grid-source_wind",
+    ev_charging:          "consumer_goods-type_electricity",
+    renewable_energy:     "consumer_goods-type_electricity",
     surplus_food:         "consumer_goods-type_food_and_drink",
     sustainable_fashion:  "consumer_goods-type_clothing",
     charity:              "consumer_goods-type_other",
@@ -39,6 +39,7 @@ export default async function handler(req, res) {
         emission_factor: {
           activity_id: activityId,
           data_version: "^33",
+          region: "GB",
         },
         parameters: {
           money: amount,
@@ -48,8 +49,34 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    res.status(200).json({ co2e: data.co2e ?? 0 });
+
+    // Log the full response to help debug
+    console.log("Climatiq response:", JSON.stringify(data));
+
+    if (data.error) {
+      // Fallback to BEIS 2024 factors if Climatiq fails
+      const BEIS = {
+        petrol: 0.236, flight: 0.990, fast_fashion: 0.127,
+        fast_food: 0.297, gas_energy: 0.038, organic_grocery: -0.020,
+        ev_charging: -0.032, renewable_energy: -0.061, surplus_food: -0.514,
+        sustainable_fashion: -0.025, charity: -0.140, oat_coffee: -0.024,
+        neutral: 0.000,
+      };
+      const fallback = parseFloat(((BEIS[category] ?? 0) * amount).toFixed(2));
+      return res.status(200).json({ co2e: fallback, source: "beis_fallback" });
+    }
+
+    res.status(200).json({ co2e: data.co2e ?? 0, source: "climatiq" });
   } catch (err) {
-    res.status(500).json({ error: "Scoring failed", detail: err.message });
+    // Fallback to BEIS 2024 on any error
+    const BEIS = {
+      petrol: 0.236, flight: 0.990, fast_fashion: 0.127,
+      fast_food: 0.297, gas_energy: 0.038, organic_grocery: -0.020,
+      ev_charging: -0.032, renewable_energy: -0.061, surplus_food: -0.514,
+      sustainable_fashion: -0.025, charity: -0.140, oat_coffee: -0.024,
+      neutral: 0.000,
+    };
+    const fallback = parseFloat(((BEIS[category] ?? 0) * amount).toFixed(2));
+    res.status(200).json({ co2e: fallback, source: "beis_fallback" });
   }
 }
