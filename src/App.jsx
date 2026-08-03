@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { computeGreenFinancialScore, CONFIG } from "./greenspendScoring";
 import {
   Zap, Leaf, Fuel, Shirt, Coffee, Flame, Heart, Recycle,
   Plane, Landmark, Wind, UtensilsCrossed, PiggyBank, Apple,
@@ -10,7 +11,6 @@ import {
   Banknote, CheckCircle, Loader
 } from "lucide-react";
 
-// ── BEIS 2024 intensity factors ───────────────────────────────────────────────
 const INTENSITY = {
   petrol:              0.236,
   flight:              0.990,
@@ -52,6 +52,33 @@ const CAT_LABEL = {
   oat_coffee:"Plant café", neutral:"ATM/Cash",
 };
 
+const CATEGORY_MAP = {
+  petrol:              { category: "petrol" },
+  flight:              { category: "air_transport" },
+  fast_fashion:        { category: "clothing" },
+  fast_food:           { category: "restaurants" },
+  gas_energy:          { category: "gas_heating" },
+  organic_grocery:     { category: "groceries" },
+  ev_charging:         { category: "ev_charging_home" },
+  renewable_energy:    { category: "electricity" },
+  surplus_food:        { category: "groceries" },
+  sustainable_fashion: { category: "clothing" },
+  charity:             { category: "charity", type: "donation" },
+  oat_coffee:          { category: "restaurants" },
+  neutral:             { category: "neutral", type: "cash" },
+};
+
+function mapToEngineTransactions(txs) {
+  return txs.map(tx => {
+    const mapping = CATEGORY_MAP[tx.activeCat] || { category: tx.activeCat };
+    return {
+      category: mapping.category,
+      amount: tx.amt,
+      type: mapping.type || "assessable",
+    };
+  });
+}
+
 function calcCO2(amt, cat) {
   return parseFloat(((INTENSITY[cat] ?? 0) * amt).toFixed(2));
 }
@@ -63,7 +90,6 @@ function getType(cat) {
   return f < 0 ? "green" : "harmful";
 }
 
-// ── Raw transactions (fallback / demo data) ───────────────────────────────────
 const RAW_TX = [
   { id:1,  merchant:"Bolt Electric",        cat:"ev_charging",         amt:24.50,  ref:"EV charge Whitechapel"       },
   { id:2,  merchant:"Tesco Organic",         cat:"organic_grocery",     amt:61.20,  ref:"Weekly shop"                 },
@@ -81,7 +107,6 @@ const RAW_TX = [
   { id:14, merchant:"Too Good To Go",        cat:"surplus_food",        amt:3.50,   ref:"Surplus food bag"            },
 ];
 
-// ── Green swap alternatives ───────────────────────────────────────────────────
 const SWAP_DEFS = [
   { id:"s1", txId:3,  amt:78.00,  from:"Shell Petrol",  to:"Pod Point EV",       fromCat:"petrol",       toCat:"ev_charging"        },
   { id:"s2", txId:4,  amt:95.00,  from:"Zara",          to:"Vinted second-hand", fromCat:"fast_fashion", toCat:"sustainable_fashion"},
@@ -96,7 +121,6 @@ const COLORS = {
   card:"#162B1E", border:"#2D6A4F44",
 };
 
-// ── Score ring ────────────────────────────────────────────────────────────────
 function ScoreRing({ score }) {
   const r=54, cx=64, cy=64, circ=2*Math.PI*r;
   const [anim, setAnim] = useState(score);
@@ -127,7 +151,6 @@ function ScoreRing({ score }) {
   );
 }
 
-// ── Tag chip ──────────────────────────────────────────────────────────────────
 function Tag({ type }) {
   const cfg={
     green:    {bg:"#14532D",color:"#86EFAC",Icon:Leaf,          label:"Green"   },
@@ -159,7 +182,6 @@ function TxIcon({ cat, type, size=18 }) {
   );
 }
 
-// ── Main app ──────────────────────────────────────────────────────────────────
 export default function GreenSpend() {
   const [tab, setTab]           = useState("dashboard");
   const [swaps, setSwaps]       = useState(SWAP_DEFS.map(s=>({...s,enabled:false})));
@@ -174,14 +196,12 @@ export default function GreenSpend() {
   const [openAlts, setOpenAlts]     = useState({});
   const [scoreCardOpen, setScoreCardOpen] = useState(false);
 
-  // ── TrueLayer state ───────────────────────────────────────────────────────
   const [bankToken, setBankToken]         = useState(null);
   const [bankConnected, setBankConnected] = useState(false);
   const [bankLoading, setBankLoading]     = useState(false);
   const [realTransactions, setRealTransactions] = useState([]);
   const [bankError, setBankError]         = useState(null);
 
-  // ── On load: check if TrueLayer redirected back with a token ─────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
@@ -189,18 +209,15 @@ export default function GreenSpend() {
       setBankToken(token);
       setBankConnected(true);
       setBankLoading(true);
-      // Clean the token from the URL so it doesn't linger
       window.history.replaceState({}, document.title, "/");
-      // Fetch real transactions from our backend
       fetch(`/api/transactions?token=${token}`)
         .then(r => r.json())
         .then(data => {
           if (data && Array.isArray(data)) {
-            // Map TrueLayer transactions to GreenSpend format
             const mapped = data.slice(0, 20).map((tx, i) => ({
               id: i + 100,
               merchant: tx.merchant_name || tx.description || "Unknown",
-              cat: "neutral", // Will be replaced by AI categorisation later
+              cat: "neutral",
               amt: Math.abs(tx.amount),
               ref: tx.description || "",
               _raw: tx,
@@ -217,7 +234,6 @@ export default function GreenSpend() {
     }
   }, []);
 
-  // ── Connect bank — redirects to TrueLayer auth ───────────────────────────
   const connectBank = () => {
     const params = new URLSearchParams({
       response_type: "code",
@@ -229,7 +245,6 @@ export default function GreenSpend() {
     window.location.href = `https://auth.truelayer-sandbox.com/?${params}`;
   };
 
-  // ── Disconnect bank ───────────────────────────────────────────────────────
   const disconnectBank = () => {
     setBankToken(null);
     setBankConnected(false);
@@ -242,10 +257,8 @@ export default function GreenSpend() {
     return ()=>clearInterval(t);
   },[]);
 
-  // ── Use real transactions if connected, otherwise demo data ──────────────
   const sourceTx = bankConnected && realTransactions.length > 0 ? realTransactions : RAW_TX;
 
-  // ── Compute derived stats with swaps applied ──────────────────────────────
   const transactions = sourceTx.map(tx=>{
     const sw=swaps.find(s=>s.txId===tx.id&&s.enabled);
     const cat=sw?sw.toCat:tx.cat;
@@ -259,11 +272,14 @@ export default function GreenSpend() {
   const donationSpend = transactions.filter(t=>t.type==="donation").reduce((a,t)=>a+t.amt,0);
   const atmSpend      = transactions.filter(t=>t.cat==="neutral").reduce((a,t)=>a+t.amt,0);
   const greenPct      = (greenSpend/totalSpend)*100;
-  const co2Penalty    = Math.min(totalCO2*0.1,50);
-  const donBonus      = Math.min(donationSpend/10,15);
-  const score         = Math.max(0,Math.min(100,Math.round(50+greenPct*0.4-co2Penalty+donBonus)));
 
-  // ── Pie chart data ────────────────────────────────────────────────────────
+  const engineTransactions = mapToEngineTransactions(transactions);
+  const engineResult = computeGreenFinancialScore(engineTransactions, {
+    ...CONFIG,
+    minTransactions: bankConnected ? CONFIG.minTransactions : 0,
+  });
+  const score = engineResult.score ?? 0;
+
   const pieData = [
     {name:"Green",   value:Math.round(greenSpend),   color:"#52B788"},
     {name:"Harmful", value:Math.round(harmfulSpend),  color:"#DC2626"},
@@ -271,7 +287,6 @@ export default function GreenSpend() {
     {name:"Neutral", value:Math.round(atmSpend),      color:"#4B5563"},
   ].filter(d=>d.value>0);
 
-  // ── Category CO₂ breakdown ─────────────────────────────────────────────────
   const catCO2={};
   transactions.forEach(t=>{
     if(!catCO2[t.activeCat])catCO2[t.activeCat]=0;
@@ -300,7 +315,6 @@ export default function GreenSpend() {
     <div style={{background:COLORS.bg,minHeight:"100vh",fontFamily:"'DM Sans',system-ui,sans-serif",color:"#E5F5EC",maxWidth:420,margin:"0 auto",boxShadow:"0 0 60px #00000066"}}>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}@keyframes glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 10px #52B78844}}@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
 
-      {/* Header */}
       <div style={{padding:"22px 18px 10px",background:`linear-gradient(180deg,${COLORS.forest},${COLORS.bg})`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -310,19 +324,17 @@ export default function GreenSpend() {
             <span style={{fontSize:19,fontWeight:700,fontFamily:"Georgia,serif",color:"#86EFAC"}}>GreenSpend</span>
           </div>
           <div style={{background:COLORS.card,border:`1px solid ${COLORS.border}`,borderRadius:20,padding:"3px 10px",fontSize:10,color:COLORS.sage,display:"flex",alignItems:"center",gap:4}}>
-            <Activity size={10} color={COLORS.sage}/>Live BEIS 2024
+            <Activity size={10} color={COLORS.sage}/>Live DESNZ 2026
           </div>
         </div>
-        <p style={{fontSize:11,color:"#6B9E80",margin:0}}>Carbon scored live using BEIS 2024 formula</p>
+        <p style={{fontSize:11,color:"#6B9E80",margin:0}}>Carbon scored live using DESNZ 2026 formula</p>
       </div>
 
       <div style={{padding:"0 14px 80px"}}>
 
-        {/* ── DASHBOARD ─────────────────────────────────────────────────── */}
         {tab==="dashboard" && (
           <div>
 
-            {/* ── TRUELAYER BANK CONNECTION CARD ── */}
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${bankConnected?"#52B78888":COLORS.border}`,padding:"12px 14px",marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                 <div style={{width:32,height:32,background:bankConnected?"#14532D":"#1A1C26",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -350,14 +362,12 @@ export default function GreenSpend() {
                 )}
               </div>
 
-              {/* Error state */}
               {bankError && (
                 <div style={{background:"#450A0A",borderRadius:10,padding:"8px 10px",marginBottom:8,fontSize:10,color:"#FCA5A5",display:"flex",alignItems:"center",gap:6}}>
                   <AlertTriangle size={12} color="#FCA5A5"/>{bankError}
                 </div>
               )}
 
-              {/* Loading spinner */}
               {bankLoading && (
                 <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0"}}>
                   <Loader size={14} color={COLORS.sage} style={{animation:"spin 1s linear infinite"}}/>
@@ -365,7 +375,6 @@ export default function GreenSpend() {
                 </div>
               )}
 
-              {/* Connect button — only show when not connected */}
               {!bankConnected && (
                 <button
                   onClick={connectBank}
@@ -390,7 +399,6 @@ export default function GreenSpend() {
                 </button>
               )}
 
-              {/* Live data badge */}
               {bankConnected && !bankLoading && realTransactions.length > 0 && (
                 <div style={{display:"flex",alignItems:"center",gap:5,marginTop:6}}>
                   <div style={{width:6,height:6,borderRadius:"50%",background:"#86EFAC",animation:"pulse 1.8s infinite"}}/>
@@ -399,7 +407,6 @@ export default function GreenSpend() {
                 </div>
               )}
 
-              {/* Demo mode badge */}
               {!bankConnected && (
                 <div style={{fontSize:10,color:"#4B7060",marginTop:6,textAlign:"center"}}>
                   Currently showing demo data · Connect to score real spending
@@ -407,7 +414,6 @@ export default function GreenSpend() {
               )}
             </div>
 
-            {/* Greenwashing alert */}
             {!dismissed && (
               <div style={{background:"#451A03",border:"1px solid #F59E0B44",borderRadius:14,padding:"10px 12px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <div style={{display:"flex",gap:7,alignItems:"flex-start"}}>
@@ -421,10 +427,8 @@ export default function GreenSpend() {
               </div>
             )}
 
-            {/* Score card — expandable on click */}
             <div style={{background:`linear-gradient(135deg,${COLORS.forest},${COLORS.moss})`,borderRadius:18,marginBottom:12,border:`1px solid ${scoreCardOpen?"#52B78888":"#52B78833"}`,overflow:"hidden",transition:"border-color .3s",boxShadow:scoreCardOpen?"0 4px 24px #0005":"none"}}>
 
-              {/* Clickable top row */}
               <div onClick={()=>setScoreCardOpen(o=>!o)}
                 style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 16px 14px",cursor:"pointer",userSelect:"none"}}>
                 <div style={{flex:1}}>
@@ -439,7 +443,6 @@ export default function GreenSpend() {
                   <div style={{fontSize:11,color:"#B7E4C7",marginBottom:10,lineHeight:1.4}}>
                     🌍 You're in the top <b style={{color:"#86EFAC"}}>{score>50?Math.round((score-50)*1.2+50):40}%</b> of green spenders
                   </div>
-                  {/* Progress bar */}
                   <div style={{height:6,background:"rgba(0,0,0,0.25)",borderRadius:3,overflow:"hidden",width:"90%"}}>
                     <div style={{height:"100%",borderRadius:3,width:`${score}%`,background:score>=70?"#52B788":score>=45?"#F59E0B":"#EF4444",transition:"width .8s ease"}}/>
                   </div>
@@ -451,7 +454,6 @@ export default function GreenSpend() {
                     </div>
                   )}
                 </div>
-                {/* Right side — ring */}
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,flexShrink:0,marginLeft:10}}>
                   <ScoreRing score={score}/>
                   <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -460,12 +462,10 @@ export default function GreenSpend() {
                 </div>
               </div>
 
-              {/* Expandable spending breakdown */}
               <div style={{maxHeight:scoreCardOpen?"420px":"0",overflow:"hidden",transition:"max-height .4s ease"}}>
                 <div style={{padding:"0 16px 18px"}}>
                   <div style={{height:".5px",background:"rgba(82,183,136,0.25)",marginBottom:14}}/>
 
-                  {/* Spending breakdown */}
                   <div style={{background:"rgba(0,0,0,0.18)",borderRadius:14,padding:"12px 14px",marginBottom:12}}>
                     <div style={{fontSize:10,color:"#95D5B2",fontWeight:600,letterSpacing:".05em",marginBottom:10,display:"flex",alignItems:"center",gap:5}}>
                       <Activity size={11} color="#95D5B2"/> Spending breakdown
@@ -498,7 +498,6 @@ export default function GreenSpend() {
                     </div>
                   </div>
 
-                  {/* Friendly stat pills */}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
                     {[
                       {v:`£${Math.round(greenSpend)}`,l:"Green spend",bg:"#14532D",col:"#86EFAC",sub:"#52B788"},
@@ -515,7 +514,6 @@ export default function GreenSpend() {
               </div>
             </div>
 
-            {/* Stats row */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:12}}>
               {[
                 {label:"Net CO₂",  value:`${totalCO2>0?"+":""}${totalCO2.toFixed(1)}kg`, color:totalCO2>0?"#FCA5A5":"#86EFAC", Icon:Globe},
@@ -530,7 +528,6 @@ export default function GreenSpend() {
               ))}
             </div>
 
-            {/* 🔄 Green Swap Simulator */}
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${COLORS.border}`,padding:"12px 14px",marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                 <RefreshCw size={13} color={COLORS.sage}/>
@@ -560,7 +557,6 @@ export default function GreenSpend() {
               })}
             </div>
 
-            {/* Collapsible score formula */}
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${scoreOpen?COLORS.sage+"66":COLORS.border}`,marginBottom:12,overflow:"hidden",transition:"border-color .3s"}}>
               <div onClick={()=>setScoreOpen(o=>!o)} style={{padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -575,10 +571,10 @@ export default function GreenSpend() {
               <div style={{maxHeight:scoreOpen?"300px":"0",overflow:"hidden",transition:"max-height .35s ease"}}>
                 <div style={{padding:"0 14px 12px",borderTop:`1px solid ${COLORS.border}`}}>
                   {[
-                    {label:"Base score",        val:"50",                             col:"#D1FAE5", Icon:Circle},
-                    {label:"Green spend bonus",  val:`+${(greenPct*.4).toFixed(1)} pts`,col:"#86EFAC",Icon:TrendingUp},
-                    {label:"CO₂ penalty",        val:`−${co2Penalty.toFixed(1)} pts`,  col:"#FCA5A5",Icon:TrendingDown},
-                    {label:"Donation bonus",     val:`+${donBonus.toFixed(1)} pts`,    col:"#E9D5FF",Icon:Gift},
+                    {label:"Carbon intensity",   val:`${engineResult.breakdown?.carbon?.points ?? 0} / 50 pts`, col:"#FCA5A5",Icon:TrendingDown},
+                    {label:"Green behaviour",    val:`${engineResult.breakdown?.green?.points ?? 0} / 20 pts`,   col:"#86EFAC",Icon:TrendingUp},
+                    {label:"Social impact",      val:`${engineResult.breakdown?.social?.points ?? 0} / 15 pts`,      col:"#E9D5FF",Icon:Gift},
+                    {label:"Transparency",       val:`${engineResult.breakdown?.transparency?.points ?? 0} / 15 pts`,      col:"#9CA3AF",Icon:ShieldCheck},
                     {label:"Final score",        val:`= ${score}/100`,                 col:COLORS.gold,Icon:Trophy},
                   ].map((r,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderTop:i>0?`1px solid ${COLORS.border}`:"none"}}>
@@ -593,7 +589,6 @@ export default function GreenSpend() {
               </div>
             </div>
 
-            {/* Recent payments */}
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${COLORS.border}`,overflow:"hidden"}}>
               <div style={{padding:"12px 14px 8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}><CreditCard size={13} color={COLORS.sage}/><span style={{fontSize:12,fontWeight:600,color:"#D1FAE5"}}>Recent payments</span></div>
@@ -616,7 +611,6 @@ export default function GreenSpend() {
           </div>
         )}
 
-        {/* ── PAYMENTS ──────────────────────────────────────────────────── */}
         {tab==="transactions" && (
           <div>
             <div style={{paddingTop:14,marginBottom:10}}>
@@ -628,7 +622,6 @@ export default function GreenSpend() {
                   </button>
                 ))}
               </div>
-              {/* CO₂ bar chart */}
               <div style={{background:COLORS.card,borderRadius:12,border:`1px solid ${COLORS.border}`,padding:"10px 12px",marginBottom:10}}>
                 <div style={{fontSize:10,color:COLORS.sage,fontWeight:600,marginBottom:8}}>CO₂ BY CATEGORY</div>
                 {sortedCats.map(([cat,co2],i)=>{
@@ -667,9 +660,9 @@ export default function GreenSpend() {
                   </div>
                   {selectedTx===tx.id && (
                     <div style={{background:COLORS.bg,margin:"0 10px 8px",borderRadius:10,padding:"10px 12px",fontSize:10,color:"#B7E4C7",lineHeight:1.9}}>
-                      <div style={{color:COLORS.sage,fontWeight:600,marginBottom:4,display:"flex",alignItems:"center",gap:5}}><ShieldCheck size={11} color={COLORS.sage}/>Live BEIS 2024 formula</div>
+                      <div style={{color:COLORS.sage,fontWeight:600,marginBottom:4,display:"flex",alignItems:"center",gap:5}}><ShieldCheck size={11} color={COLORS.sage}/>Live DESNZ 2026 formula</div>
                       <div style={{fontFamily:"monospace",color:"#86EFAC",fontSize:11}}>£{tx.amt.toFixed(2)} × {INTENSITY[tx.activeCat]??0} = {tx.co2>0?"+":""}{tx.co2.toFixed(2)} kg CO₂</div>
-                      <div style={{color:"#6B9E80",marginTop:4}}>Factor source: BEIS 2024 / Exiobase</div>
+                      <div style={{color:"#6B9E80",marginTop:4}}>Factor source: DESNZ 2026 / Exiobase</div>
                       {tx.swapped&&<div style={{marginTop:5,color:"#86EFAC"}}>✓ Green swap active — swapped from {tx.merchant}</div>}
                     </div>
                   )}
@@ -679,12 +672,11 @@ export default function GreenSpend() {
           </div>
         )}
 
-        {/* ── CALCULATOR ────────────────────────────────────────────────── */}
         {tab==="calculator" && (
           <div>
             <div style={{paddingTop:14,marginBottom:12}}>
               <div style={{fontSize:15,fontWeight:700,fontFamily:"Georgia,serif",color:"#86EFAC",marginBottom:4,display:"flex",alignItems:"center",gap:7}}><Calculator size={16} color="#86EFAC"/>Carbon Impact Calculator</div>
-              <div style={{fontSize:11,color:"#6B9E80"}}>Type any amount — CO₂ calculated live using BEIS 2024</div>
+              <div style={{fontSize:11,color:"#6B9E80"}}>Type any amount — CO₂ calculated live using DESNZ 2026</div>
             </div>
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${COLORS.border}`,padding:"14px",marginBottom:12}}>
               <label style={{fontSize:10,color:"#9CA3AF",display:"block",marginBottom:4}}>Amount (£)</label>
@@ -711,15 +703,14 @@ export default function GreenSpend() {
                   {calcResult.co2>0?"+":""}{calcResult.co2.toFixed(2)} kg
                 </div>
                 <div style={{background:"rgba(0,0,0,.2)",borderRadius:9,padding:"9px 11px",fontSize:11}}>
-                  <div style={{fontSize:9,color:"#9CA3AF",marginBottom:3}}>📐 BEIS 2024 Formula</div>
+                  <div style={{fontSize:9,color:"#9CA3AF",marginBottom:3}}>📐 DESNZ 2026 Formula</div>
                   <div style={{fontFamily:"monospace",color:"#D1FAE5"}}>£{calcResult.amt.toFixed(2)} × {calcResult.factor} = {calcResult.co2>0?"+":""}{calcResult.co2.toFixed(2)} kg CO₂</div>
                 </div>
               </div>
             )}
-            {/* Live intensity table */}
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${COLORS.border}`,padding:"12px 14px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <div style={{display:"flex",alignItems:"center",gap:6}}><ShieldCheck size={13} color="#D1FAE5"/><span style={{fontSize:11,fontWeight:600,color:"#D1FAE5"}}>BEIS 2024 Intensity Factors</span></div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}><ShieldCheck size={13} color="#D1FAE5"/><span style={{fontSize:11,fontWeight:600,color:"#D1FAE5"}}>DESNZ 2026 Intensity Factors</span></div>
                 <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:6,height:6,borderRadius:"50%",background:"#86EFAC",animation:"pulse 1.8s infinite"}}/><span style={{fontSize:9,color:COLORS.sage}}>LIVE</span></div>
               </div>
               {CALC_CATS.map((c,i)=>{
@@ -743,19 +734,18 @@ export default function GreenSpend() {
           </div>
         )}
 
-        {/* ── CARBON ────────────────────────────────────────────────────── */}
         {tab==="carbon" && (
           <div>
             <div style={{paddingTop:14,marginBottom:12}}>
               <div style={{fontSize:15,fontWeight:700,fontFamily:"Georgia,serif",color:"#86EFAC",marginBottom:4,display:"flex",alignItems:"center",gap:7}}><Globe size={16} color="#86EFAC"/>Carbon Footprint</div>
-              <div style={{fontSize:11,color:"#6B9E80"}}>All values calculated live using BEIS 2024 formula</div>
+              <div style={{fontSize:11,color:"#6B9E80"}}>All values calculated live using DESNZ 2026 formula</div>
             </div>
             <div style={{background:`linear-gradient(135deg,${COLORS.forest},${COLORS.moss})`,borderRadius:18,padding:"18px",marginBottom:12,border:`1px solid ${COLORS.sage}33`,textAlign:"center"}}>
               <Globe size={20} color={COLORS.sage} style={{margin:"0 auto 6px"}}/>
               <div style={{fontSize:10,color:COLORS.sage,letterSpacing:".1em",fontWeight:600,marginBottom:5}}>TOTAL NET CO₂</div>
               <div style={{fontSize:48,fontWeight:700,color:totalCO2>0?"#FCA5A5":"#86EFAC",fontFamily:"Georgia,serif",lineHeight:1}}>{totalCO2>0?"+":""}{totalCO2.toFixed(1)}</div>
               <div style={{fontSize:12,color:"#D1FAE5",marginTop:4}}>kg CO₂ equivalent</div>
-              <div style={{fontSize:10,color:"#B7E4C7",marginTop:8}}>Auto-calculated: <b style={{color:COLORS.gold}}>Amount × BEIS factor</b></div>
+              <div style={{fontSize:10,color:"#B7E4C7",marginTop:8}}>Auto-calculated: <b style={{color:COLORS.gold}}>Amount × DESNZ factor</b></div>
               {swaps.some(s=>s.enabled)&&<div style={{marginTop:8,background:"rgba(0,0,0,.2)",borderRadius:10,padding:"5px 12px",fontSize:10,color:"#86EFAC"}}>✓ {swaps.filter(s=>s.enabled).length} green swap{swaps.filter(s=>s.enabled).length>1?"s":""} active</div>}
             </div>
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${COLORS.border}`,padding:"12px 14px",marginBottom:12}}>
@@ -773,7 +763,6 @@ export default function GreenSpend() {
                 </div>
               ))}
             </div>
-            {/* ── Green Alternatives ─────────────────────────────────── */}
             <div style={{background:COLORS.card,borderRadius:14,border:`1px solid ${COLORS.border}`,padding:"12px 14px",marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
                 <Zap size={13} color={COLORS.sage}/>
@@ -861,7 +850,6 @@ export default function GreenSpend() {
               })}
             </div>
 
-            {/* ATM note */}
             <div style={{background:"#162030",border:"1px solid #6B728044",borderRadius:13,padding:"11px 13px",display:"flex",gap:9,alignItems:"flex-start"}}>
               <ArrowDownToLine size={15} color="#9CA3AF" style={{flexShrink:0,marginTop:1}}/>
               <div>
@@ -873,7 +861,6 @@ export default function GreenSpend() {
         )}
       </div>
 
-      {/* Bottom nav */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:420,background:COLORS.card,borderTop:`1px solid ${COLORS.border}`,display:"grid",gridTemplateColumns:"repeat(4,1fr)",padding:"7px 0 11px",zIndex:100}}>
         {navItems.map(n=>(
           <button key={n.id} onClick={()=>setTab(n.id)} style={{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:2,cursor:"pointer",padding:"3px 0"}}>
